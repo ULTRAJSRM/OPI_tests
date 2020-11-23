@@ -1,0 +1,214 @@
+---
+title: "Bebés en Toluca"
+author: "Jorge Salvador Ruiz Montaño"
+date: "22/11/2020"
+output:
+  html_document:
+    df_print: paged
+    toc_depth: '4'
+  pdf_document: 
+    keep_tex: yes
+    toc_depth: 4
+geometry: margin = 1.1cm
+classoption: landscape
+---
+
+
+```{r setup, include=FALSE}
+
+# Configuración del entorno de Python dentro de Rmarkdown, paquetes de R y salida de knitr a pdf
+
+knitr::opts_chunk$set(echo = TRUE)
+library(rjson)
+library(reticulate)
+library(rbin)
+library(readxl)
+library(knitr)
+library(dplyr)
+library(formattable)
+library(kableExtra)
+library(lubridate)
+library(tinytex)
+library(ggplot2)
+library(plyr)
+use_condaenv('C:\\Users\\Jorge SRM\\.conda\\envs\\platzi_data\\python.exe')
+```
+
+## Sección A
+### A.1 Bebés
+
+1. Para cada AGEB del Municipio de Toluca, estima cuántos bebés de 0 a 6 meses de edad habitan ahí el día de hoy. Explica tu razonamiento en menos de 300 palabras. Enlista tus fuentes y presenta resultados.        
+
+- Primero vamos a utilizar una base de datos del estado de México. **Link:** https://salud.edomex.gob.mx/isem/dis_n_proy_conapo.
+- Estos datos miden los nacimientos en el estado de México, hay varias bases de datos por año, pero a nosotros nos interesa utilizar la base **Por municipio y lugar de nacimiento**, ya que en ésta se listan todos los municipios (incluido Toluca que es el que nos interesa).
+- Extrajimos los datos de Toluca y los colocamos en un Excel que nombramos: toluca_nacimientos.xlsx
+- Además usamos los datos de Censo de Población y vivienda 2010, de donde se extrajeros los datos de población de Toluca por AGEB. **Link:** https://www.inegi.org.mx/programas/ccpv/2010/default.html#Datos_abiertos 
+
+### Tabla Nacimientos de Toluca por Año (2008-2014)
+
+```{r exportando_datos, echo=FALSE, warning=FALSE}
+bebes_por_anio_data = read_excel("C:\\Users\\Jorge SRM\\Documents\\OPI\\bebes\\toluca_nacimientos.xlsx",
+                                              sheet = "data")
+
+# Le damos formato a los columnas del dataset
+
+
+
+
+
+bebes_por_anio_data = data.frame(bebes_por_anio_data)
+
+bebes_por_anio_data$Secretaria_de_salud = paste(format(round(as.numeric(bebes_por_anio_data$Secretaria_de_salud),digits =1), big.mark = ",", scientific = FALSE,trim=TRUE),sep = "")
+
+kable(bebes_por_anio_data,
+      align = c('l','l','c','c','c','c','c','c','c','c','c','c','c','c','c','c'),
+      row.names = FALSE,
+      escape = TRUE,
+      booktabs=TRUE,
+      col.names = linebreak(c("Año",
+                              "Municipio",
+                              "Secretaria de Salud",
+                              "IMSS Oportunidades",
+                              "IMSS",
+                              "ISSSTE",
+                              "PEMEX",
+                              "SEDENA",
+                              "SEMAR",
+                              "Otra unidad Pública",
+                              "Unidad Médica Privada",
+                              "Vía Pública",
+                              "Hogar",
+                              "Otro Lugar",
+                              "No especificado",
+                              "Total General"
+                              ),align="c")
+      )%>%
+kable_styling(font_size = 8)%>%
+kable_styling(latex_options = "scale_down")%>%
+row_spec(0,bold = TRUE,align = "c")%>%
+collapse_rows(1, latex_hline = "full")%>%
+add_header_above(c(" "=2,
+                   "Lugar de Nacimiento"=13,
+                   " "=1))
+
+
+```
+
+
+\newpage
+
+## Gráfica de Nacimientos por Año
+
+Podemos observar como han fluctuado los nacimientos totales por año en Toluca
+
+
+```{python Trabajando_con_Pandas, echo=FALSE, warning=FALSE}
+
+# Librerias Python
+import pandas as pd
+
+# Trayendo el dataset de R
+df_toluca = pd.DataFrame(r.bebes_por_anio_data)
+
+# Calculando el promedio de nacimientos por año en Toluca:
+toluca_prom = df_toluca['Total_general'].mean()
+
+# Calculando el promedio de nacimientos por mes:
+toluca_prom_mes = toluca_prom/12
+
+# El numero aproximado de nacimientos en los próximos 6 meses, sería:
+num_aprox_toluca_6_meses = toluca_prom_mes*6
+
+#print(toluca_prom)
+#print(toluca_prom_mes)
+#print(num_aprox_toluca_6_meses)
+
+```
+
+
+```{r exportando_datos2, echo=FALSE, warning=FALSE}
+
+nacimientos_por_anio = data.frame(bebes_por_anio_data$Anio,
+                                  bebes_por_anio_data$Total_general)
+
+```
+
+
+
+```{r Grafica_superficie , fig.height=5, fig.width=7, fig.align='center', echo=FALSE, warning=FALSE, message=FALSE}
+
+
+
+
+ggplot(data=bebes_por_anio_data, aes(x=Anio, y=Total_general)) + 
+    geom_bar(stat="identity",color="darkblue", fill="lightblue") +
+  labs(title="Nacimientos totales por Año en Toluca",x="Año", y = "Número de Nacimientos")
+
+
+```
+
+## Cálculo de los nacimientos a nivel Toluca (Total)
+
+- Primero se calculó el promedio de nacimientos por año, que resultó: **39415**
+- Por lo que el promedio de nacimientos por mes fue: **3284.6**
+
+\newpage
+
+Ahora tenemos que análizar el numero de niños entre 0-2 años que hay por cada AGEB en Toluca.
+
+- Para ello obtenemos los totales por AGEB de Toluca, los comparamos con los nacimientos promedio y obtenemos el resultado aproximado.
+
+- Para ver los detalles del cálculo y manejo de datos puede consultar el código de R.
+
+
+```{r exportando_datos_ageb, echo=FALSE, warning=FALSE}
+toluca_ageb_data = read_excel("C:\\Users\\Jorge SRM\\Documents\\OPI\\bebes\\toluca_ageb.xlsx",
+                                              sheet = "data1")
+
+# Le damos formato a los columnas del dataset
+toluca_ageb = data.frame(toluca_ageb_data)
+
+# Filtro para quedarme solo con los totales de cada AGEB
+toluca_ageb_totales = toluca_ageb[toluca_ageb$nom_loc == "Total AGEB urbana",]
+
+# Quito los valores que vienen en * y les asigno 0
+toluca_ageb_totales[toluca_ageb_totales=="*"]<-0
+
+# Obtengo el gran total de todas las AGEB
+toluca_ageb_totales$p_0a2 = as.numeric(toluca_ageb_totales$p_0a2)
+
+toluca_ageb_gran_total =  sum(toluca_ageb_totales$p_0a2)
+
+#Creo una nueva columna con el porcentaje de niños por cada AGEB
+toluca_ageb_totales$por_kids = (toluca_ageb_totales$p_0a2/toluca_ageb_gran_total)*100
+
+# Creamos una nueva columna donde multipliquemos el porcentaje de niños por AGEB por el porcentaje de nacimientos promedio por mes, por 6 meses:
+toluca_ageb_totales$por_nacimientos_6_meses =  (toluca_ageb_totales$por_kids/100)*3284*6
+
+# Asigno formato a los totales:
+toluca_ageb_totales$por_nacimientos_6_meses=paste(format(round(as.numeric(toluca_ageb_totales$por_nacimientos_6_meses),digits =1), big.mark = ",", scientific = FALSE,trim=TRUE),sep = "")
+
+
+# Generamos el dataframe con los resultados de las AGEBs
+
+nacimientos_por_AGEB = data.frame(toluca_ageb_totales$ageb,
+                                  toluca_ageb_totales$por_nacimientos_6_meses)
+
+
+# Tabla salida de las AGEBs
+
+kable(nacimientos_por_AGEB,
+      align = c('l','c'),
+      row.names = FALSE,
+      escape = TRUE,
+      booktabs=TRUE,
+      col.names = linebreak(c("AGEB",
+                              "Número niños de 0 a 6 meses"
+                              ),align="c")
+      )%>%
+kable_styling(font_size = 8)%>%
+kable_styling(latex_options = "scale_down")
+
+
+
+```
