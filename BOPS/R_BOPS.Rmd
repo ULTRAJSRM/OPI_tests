@@ -1,0 +1,301 @@
+---
+title: "Caso BOPS"
+author: "Jorge Salvador Ruiz Montaño"
+date: "23/11/2020"
+output:
+  html_document:
+    df_print: paged
+    toc_depth: '4'
+  pdf_document: 
+    keep_tex: yes
+    toc_depth: 4
+geometry: margin = 1.1cm
+classoption: landscape
+---
+
+
+```{r setup, include=FALSE}
+
+# Configuración del entorno de Python dentro de Rmarkdown, paquetes de R y salida de knitr a pdf
+
+knitr::opts_chunk$set(echo = TRUE)
+library(rjson)
+library(reticulate)
+library(rbin)
+library(readxl)
+library(knitr)
+library(dplyr)
+library(formattable)
+library(kableExtra)
+library(lubridate)
+library(tinytex)
+library(ggplot2)
+library(plyr)
+use_condaenv('C:\\Users\\Jorge SRM\\.conda\\envs\\platzi_data\\python.exe')
+```
+
+
+## Sección C
+### C.1 BOPS
+
+Resuelve el caso **Evaluating BOPS at Home and Kitchen**
+
+1. ¿Deberían expandirse a Canadá?
+
+2. ¿Cuántos millones de dólares se ganaron o perdieron a partir del programa? Explica tu razonamiento y metodología.
+
+- Como nos dice el caso, se realizó un estudio tomando como base las DMA (Designed Market Areas) que son las áreas donde se concentra el mayor número de posibles clientes dentro de un radio definido.
+- Ahora tenemos dos tipos de mediciones, antes de antes de lanzar BOPS y otras después de lanzar BOPS.
+- Usando estos datos podemos comparar como fluctuó la venta por DMA y además podemos separar aquellos DMA que estabán cerca de una tienda y lejos de una tienda (Radio de 50 millas), lo cual puede influir bastante en el uso de BOPS ya que se requiere que el cliente recoja su producto en tienda.
+- Se realizaron 3 graficas para comparar la venta online a nivel DMA en (USA) y por BM en Cánada, se tomaron en cuenta todas la suma de la venta de todas las tiendas por semana.
+
+\newpage
+
+### Resultados de DMAs cercanas.
+
+```{r exportando_datos_DMAs_Cerca, echo=FALSE, warning=FALSE}
+Online_sales_data = read_excel("C:\\Users\\Jorge SRM\\Documents\\OPI\\BOPS_case\\BOPS_case\\diccionarios.xlsx",
+                                              sheet = "Online Sales")
+
+
+BM_sales_data = read_excel("C:\\Users\\Jorge SRM\\Documents\\OPI\\BOPS_case\\BOPS_case\\diccionarios.xlsx",
+                                              sheet = "B&M Sales")
+
+# Le damos formato a los columnas del dataset
+
+
+
+BM_sales_data = data.frame(BM_sales_data)
+
+Online_sales_data = data.frame(Online_sales_data)
+
+# Venta online
+
+# filtrando solo las ventas Online Close
+Online_sales_data_Close = Online_sales_data[Online_sales_data$close == 1,]
+
+
+# Separamos las ventas close en after y before
+Online_sales_data_Close_Before = Online_sales_data_Close[Online_sales_data_Close$after == 0,]
+
+Online_sales_data_Close_After = Online_sales_data_Close[Online_sales_data_Close$after == 1,]
+
+# vamos a extrer solo el DMA, el num de semana y la venta:
+Online_sales_data_Close_Before = data.frame(  Num_Year = Online_sales_data_Close_Before$year,
+                                              Num_Week = Online_sales_data_Close_Before$week,
+                                              Imp_Venta = Online_sales_data_Close_Before$sales)
+
+Online_sales_data_Close_After = data.frame( Num_year = Online_sales_data_Close_After$year,
+                                            Num_Week = Online_sales_data_Close_After$week,
+                                            Imp_Venta = Online_sales_data_Close_After$sales)
+
+
+Online_sales_data_Close_After_2011 = Online_sales_data_Close_After[Online_sales_data_Close_After$Num_year == 2011,]
+
+Online_sales_data_Close_After_2012 = Online_sales_data_Close_After[Online_sales_data_Close_After$Num_year == 2012,]
+
+Online_sales_data_Close_After_2012$Num_Week = Online_sales_data_Close_After_2012$Num_Week+53
+
+Online_sales_data_Close_After = merge(Online_sales_data_Close_After_2011, Online_sales_data_Close_After_2012, all=TRUE)
+
+
+# Hacemos una suma por DMA para ver cuanto se vendía antes y después de los cercanos y lejanos.
+
+#Online_sales_data_Close_Before$Num_Week = as.character.default(Online_sales_data_Close_Before$Num_Week)
+
+Totales_DMA_Close_Before = aggregate(Online_sales_data_Close_Before$Imp_Venta, by=list(Semana=Online_sales_data_Close_Before$Num_Week), FUN=sum)
+ Totales_DMA_Close_Before$flag_after=0
+
+
+#Online_sales_data_Close_After$Num_Week = as.character.default(Online_sales_data_Close_After$Num_Week)
+
+Totales_DMA_Close_After = aggregate(Online_sales_data_Close_After$Imp_Venta, by=list(Semana=Online_sales_data_Close_After$Num_Week), FUN=sum)
+
+Totales_DMA_Close_After$flag_after=1
+
+
+# Haciendo el Merge de After y Before
+
+Totales_DMA_Close_total = merge(Totales_DMA_Close_Before, Totales_DMA_Close_After, all=TRUE)
+
+Totales_DMA_Close_total$flag_after = as.character.default(Totales_DMA_Close_total$flag_after)
+
+
+# Plot de la venta online en las DMA cercanas. Vemos que la tencia es que las ventas online bajaron.
+
+ggplot(data=Totales_DMA_Close_total, aes(x=Semana, y=x, fill=flag_after)) + 
+    geom_bar(stat="identity",color="darkblue") +
+  labs(title="Ventas Online Totales DMAs Cercanas por Semana (USA)",x="Número de Semana", y = "Importe venta (DLS)")
+
+
+
+
+
+
+
+
+
+```
+
+- Se puede observar como la venta online tendió a bajar después de que se lanzó BOPS (exceptuando el pico por ventas de fin de año).
+
+
+### Resultados de DMAs lejanas.
+
+
+```{r DMAs_Lejanas, echo=FALSE, warning=FALSE}
+
+
+# Venta online
+
+# filtrando solo las ventas Online Close
+Online_sales_data_Close0 = Online_sales_data[Online_sales_data$close == 0,]
+
+test0 = sum(Online_sales_data_Close0$sales)
+
+# Separamos las ventas close en after y before
+Online_sales_data_Close0_Before = Online_sales_data_Close0[Online_sales_data_Close0$after == 0,]
+
+Online_sales_data_Close0_After = Online_sales_data_Close0[Online_sales_data_Close0$after == 1,]
+
+# vamos a extrer solo el DMA, el num de semana y la venta:
+Online_sales_data_Close0_Before = data.frame(  Num_Year = Online_sales_data_Close0_Before$year,
+                                              Num_Week = Online_sales_data_Close0_Before$week,
+                                              Imp_Venta = Online_sales_data_Close0_Before$sales)
+
+Online_sales_data_Close0_After = data.frame( Num_year = Online_sales_data_Close0_After$year,
+                                            Num_Week = Online_sales_data_Close0_After$week,
+                                            Imp_Venta = Online_sales_data_Close0_After$sales)
+
+
+Online_sales_data_Close0_After_2011 = Online_sales_data_Close0_After[Online_sales_data_Close0_After$Num_year == 2011,]
+
+Online_sales_data_Close0_After_2012 = Online_sales_data_Close0_After[Online_sales_data_Close0_After$Num_year == 2012,]
+
+Online_sales_data_Close0_After_2012$Num_Week = Online_sales_data_Close0_After_2012$Num_Week+53
+
+Online_sales_data_Close0_After = merge(Online_sales_data_Close0_After_2011, Online_sales_data_Close0_After_2012, all=TRUE)
+
+
+# Hacemos una suma por DMA para ver cuanto se vendía antes y después de los cercanos y lejanos.
+
+#Online_sales_data_Close_Before$Num_Week = as.character.default(Online_sales_data_Close_Before$Num_Week)
+
+Totales_DMA_Close0_Before = aggregate(Online_sales_data_Close0_Before$Imp_Venta, by=list(Semana=Online_sales_data_Close0_Before$Num_Week), FUN=sum)
+ Totales_DMA_Close0_Before$flag_after=0
+
+
+#Online_sales_data_Close_After$Num_Week = as.character.default(Online_sales_data_Close_After$Num_Week)
+
+Totales_DMA_Close0_After = aggregate(Online_sales_data_Close0_After$Imp_Venta, by=list(Semana=Online_sales_data_Close0_After$Num_Week), FUN=sum)
+
+Totales_DMA_Close0_After$flag_after=1
+
+
+# Haciendo el Merge de After y Before
+
+Totales_DMA_Close0_total = merge(Totales_DMA_Close0_Before, Totales_DMA_Close0_After, all=TRUE)
+
+Totales_DMA_Close0_total$flag_after = as.character.default(Totales_DMA_Close0_total$flag_after)
+
+
+# Plot de la venta online en las DMA cercanas. Vemos que la tencia es que las ventas online bajaron.
+
+ggplot(data=Totales_DMA_Close0_total, aes(x=Semana, y=x, fill=flag_after)) + 
+    geom_bar(stat="identity",color="darkblue") +
+  labs(title="Ventas Online Totales DMAs Lejanas por Semana (USA)",x="Número de Semana", y = "Importe venta (DLS)")
+
+
+
+
+
+
+```
+
+- cabría esperar que las ventas de tiendas lejanas tuviera una distribución diferente a las cercanas, pero demos ver casi la misma tendencia, lo que nos dice que a los usuarios no les importa mucho el lugar donde se encuentra la tienda física al comprar en Linea.
+
+
+
+### Resultados de Venta BM en Canadá
+
+```{r venta_BM_canada, echo=FALSE, warning=FALSE}
+
+
+# Venta por BM
+
+# filtrando solo las ventas BM de USA
+BM_sales_data_usa = BM_sales_data[BM_sales_data$usa == 1,]
+
+# filtrando solo las ventas BM de Canadá
+BM_sales_data_canada = BM_sales_data[BM_sales_data$usa == 0,]
+
+# filtrando las ventas de BM de Canadá Antes de BOPS
+BM_sales_data_canada_Before_BOPS = BM_sales_data_canada[BM_sales_data_canada$after == 0,]
+
+# filtrando las ventas de BM de Canadá Después de BOPS
+BM_sales_data_canada_After_BOPS = BM_sales_data_canada[BM_sales_data_canada$after == 1,]
+
+
+# vamos a extrer solo el id de la tienda, el num de semana y la venta:
+BM_sales_data_canada_Before_BOPS = data.frame(Num_year = BM_sales_data_canada_Before_BOPS$year,
+                                              Num_Week = BM_sales_data_canada_Before_BOPS$week,
+                                              Imp_Venta = BM_sales_data_canada_Before_BOPS$sales)
+
+
+
+BM_sales_data_canada_After_BOPS = data.frame(Num_year = BM_sales_data_canada_After_BOPS$year,
+                                              Num_Week = BM_sales_data_canada_After_BOPS$week,
+                                              Imp_Venta = BM_sales_data_canada_After_BOPS$sales)
+
+
+
+BM_sales_data_canada_After_BOPS_2011 = BM_sales_data_canada_After_BOPS[BM_sales_data_canada_After_BOPS$Num_year == 2011,]
+
+BM_sales_data_canada_After_BOPS_2012 = BM_sales_data_canada_After_BOPS[BM_sales_data_canada_After_BOPS$Num_year == 2012,]
+
+BM_sales_data_canada_After_BOPS_2012$Num_Week = BM_sales_data_canada_After_BOPS_2012$Num_Week+53
+
+BM_sales_data_canada_After_BOPS = merge(BM_sales_data_canada_After_BOPS_2011, BM_sales_data_canada_After_BOPS_2012, all=TRUE)
+
+
+
+BM_sales_data_canada_Before_BOPS = aggregate(BM_sales_data_canada_Before_BOPS$Imp_Venta, by=list(Semana=BM_sales_data_canada_Before_BOPS$Num_Week), FUN=sum)
+
+BM_sales_data_canada_Before_BOPS$flag_after=0
+
+
+#Online_sales_data_Close_After$Num_Week = as.character.default(Online_sales_data_Close_After$Num_Week)
+
+BM_sales_data_canada_After_BOPS = aggregate(BM_sales_data_canada_After_BOPS$Imp_Venta, by=list(Semana=BM_sales_data_canada_After_BOPS$Num_Week), FUN=sum)
+
+BM_sales_data_canada_After_BOPS$flag_after=1
+
+
+# Haciendo el Merge de After y Before
+
+Totales_BM_Canada_total = merge(BM_sales_data_canada_Before_BOPS, BM_sales_data_canada_After_BOPS, all=TRUE)
+
+Totales_BM_Canada_total$flag_after = as.character.default(Totales_BM_Canada_total$flag_after)
+
+
+# Plot de la venta online en las DMA cercanas. Vemos que la tencia es que las ventas online bajaron.
+
+ggplot(data=Totales_BM_Canada_total, aes(x=Semana, y=x, fill=flag_after)) + 
+    geom_bar(stat="identity",color="darkblue") +
+  labs(title="Ventas BM Totales por Semana (Canadá)",x="Número de Semana", y = "Importe venta (DLS)")
+
+
+
+
+```
+
+- La  ventas en Cánada por BM también están bajando luego de incorporar BOPS en USA, puede ser débido a los problemas de lógista que arrastra la empresa debido a BOPS.
+
+
+### Conclusiones
+
+- Dado que la tendencia en las ventas online no se ve afectada por el sitió de la tienda física, a los clientes no se les ve muy motivados a usar BOPS y recoger sus productos en tienda. Al menos en USA. Mi recomendación sería no expandir BOPS a Canadá si no se tiene cambios en la tendencia de venta online que favorezcan a las tiendas que se encuentran cerca del cliente. Se podrían trazar indicadores como de % de compra por BOPS vs envios a domicilio por DMA.
+
+- En cuanto a lo que se perdió debido a DMAs, viene en la descripción del problema (a grandes razgos) que fueron \$2000 DLS en promedio por DMA y \$7545 DLS en promedio por tienda física, por tiempo no será posible hacer una estimación más a fondo de las pérdidas, pero se podría hacer sacando totales de las ventas antes y después (mismas que use para las gráficas) de BOPS o utilizando el promedio de pérdidas y el total de BOPS y tiendas registradas.
+
+
